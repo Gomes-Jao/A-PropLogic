@@ -1,0 +1,96 @@
+from dataclasses import dataclass
+from typing import List, Set, Dict
+from queue import PriorityQueue
+
+@dataclass
+class Sentence:
+    premises: Set[str]
+    conclusion: str
+
+    def __str__(self):
+        if len(self.premises) == 1:
+            return f"{list(self.premises)[0]} → {self.conclusion}"
+        return f"({' & '.join(self.premises)}) → {self.conclusion}"
+
+class TheoremProver:
+    def __init__(self):
+        self.knowledge_base: List[Sentence] = []
+        self.facts: Set[str] = set()
+        
+    def add_rule(self, premises: Set[str], conclusion: str):
+        self.knowledge_base.append(Sentence(premises, conclusion))
+        
+    def add_fact(self, fact: str):
+        self.facts.add(fact)
+        
+    def heuristic(self, current_facts: Set[str], goal: str) -> int:
+        # Heurística simples: número de premissas faltantes para alcançar o objetivo
+        if goal in current_facts:
+            return 0
+        
+        min_distance = float('inf')
+        for rule in self.knowledge_base:
+            if rule.conclusion == goal:
+                missing_premises = len(rule.premises - current_facts)
+                min_distance = min(min_distance, missing_premises)
+        
+        return min_distance if min_distance != float('inf') else 10
+
+    def prove(self, goal: str) -> List[str]:
+        pq = PriorityQueue()
+        initial_state = self.facts.copy()
+        initial_cost = self.heuristic(initial_state, goal)
+        pq.put((initial_cost, initial_state, []))
+        
+        visited = set()
+        
+        while not pq.empty():
+            _, current_facts, path = pq.get()
+            
+            if goal in current_facts:
+                return path
+            
+            facts_key = frozenset(current_facts)
+            if facts_key in visited:
+                continue
+                
+            visited.add(facts_key)
+            
+            for rule in self.knowledge_base:
+                if rule.premises.issubset(current_facts) and rule.conclusion not in current_facts:
+                    new_facts = current_facts | {rule.conclusion}
+                    new_cost = self.heuristic(new_facts, goal)
+                    new_path = path + [str(rule)]
+                    pq.put((new_cost, new_facts, new_path))
+        
+        return []
+
+# Exemplo de uso
+def main():
+    prover = TheoremProver()
+    
+    # Adicionar regras (S1 a S6)
+    prover.add_rule({'A', 'B'}, 'C')           # S1
+    prover.add_rule({'A'}, 'D')                # S2
+    prover.add_rule({'C', 'D'}, 'E')           # S3
+    prover.add_rule({'B', 'E', 'F'}, 'G')      # S4
+    prover.add_rule({'A', 'E'}, 'H')           # S5
+    prover.add_rule({'D', 'E', 'H'}, 'I')      # S6
+    
+    # Adicionar fatos (S7 a S9)
+    prover.add_fact('A')                       # S7
+    prover.add_fact('B')                       # S8
+    prover.add_fact('F')                       # S9
+    
+    # Provar H
+    proof = prover.prove('H')
+    
+    if proof:
+        print("Prova encontrada:")
+        for step in proof:
+            print(f"- {step}")
+    else:
+        print("Não foi possível provar H")
+
+if __name__ == "__main__":
+    main()
